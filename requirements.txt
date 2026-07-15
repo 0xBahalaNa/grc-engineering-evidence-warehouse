@@ -1,0 +1,6 @@
+# Exact pins: dbt-duckdb leaves dbt-core (>=1.8) and duckdb (>=1.0)
+# unbounded, and dbt-core 2.0 (the Rust/Fusion-based rebuild) is already
+# on PyPI as an alpha.
+dbt-core==1.11.12
+dbt-duckdb==1.10.1
+duckdb==1.5.4

@@ -1,0 +1,14 @@
+# dbt runtime artifacts
+/target/
+/dbt_packages/
+/logs/
+/.user.yml
+
+# DuckDB database files
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp/
+
+# Python
+/.venv/
+__pycache__/
