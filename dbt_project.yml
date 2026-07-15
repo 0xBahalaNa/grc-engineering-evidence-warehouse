@@ -1,0 +1,9 @@
+name: evidence_warehouse
+profile: evidence_warehouse
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+flags:
+  send_anonymous_usage_stats: false

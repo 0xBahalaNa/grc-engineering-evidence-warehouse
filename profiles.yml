@@ -1,0 +1,7 @@
+evidence_warehouse:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('EVIDENCE_DB_PATH', 'evidence_warehouse.duckdb') }}"
+      threads: 1
