@@ -1,0 +1,46 @@
+[
+  {
+    "source": "sg_audit",
+    "check_id": "open-to-internet-risky-port",
+    "resource_id": "sg-0abc123def456789a",
+    "status": "FAIL",
+    "collected_at": "2026-07-15T12:00:00Z",
+    "from_port": "22",
+    "to_port": "22",
+    "cidr_ip": "0.0.0.0/0",
+    "sg_name": "legacy-bastion-sg"
+  },
+  {
+    "source": "sg_audit",
+    "check_id": "open-to-internet-risky-port",
+    "resource_id": "sg-0fedc987ba654321f",
+    "status": "FAIL",
+    "collected_at": "2026-07-15T12:00:00Z",
+    "from_port": "3389",
+    "to_port": "3389",
+    "cidr_ip": "0.0.0.0/0",
+    "sg_name": "win-admin-sg"
+  },
+  {
+    "source": "sg_audit",
+    "check_id": "open-to-internet-nonrisky-port",
+    "resource_id": "sg-0aa11bb22cc33dd44",
+    "status": "WARN",
+    "collected_at": "2026-07-15T12:00:00Z",
+    "from_port": "80",
+    "to_port": "80",
+    "cidr_ip": "0.0.0.0/0",
+    "sg_name": "public-web-sg"
+  },
+  {
+    "source": "sg_audit",
+    "check_id": "open-to-internet-nonrisky-port",
+    "resource_id": "sg-0bb22cc33dd44ee55",
+    "status": "WARN",
+    "collected_at": "2026-07-15T12:00:00Z",
+    "from_port": "All",
+    "to_port": "All",
+    "cidr_ip": "0.0.0.0/0",
+    "sg_name": "wide-open-sg"
+  }
+]

@@ -43,13 +43,13 @@ The split is deliberately ELT: the Python loader does extract-and-load only — 
 
 ## Compliance Controls Addressed
 
-These are the warehouse's own controls. The producers' controls (SC-28, SC-7, AU-2, AC-3/AC-6) travel with their findings through the `dim_controls` mapping.
+These are the warehouse's own controls. The producers' controls (SC-28, SC-7, AU-2/AC-6(9), AC-3/AC-6) travel with their findings through the `dim_controls` mapping.
 
 | NIST 800-53 Rev 5 | FedRAMP High | CJIS v6.0 | How This Repo Validates |
 |---|:---:|:---:|---|
 | AU-6 | Yes | Weekly-review + 1-year-retention delta | The analysis layer over collector output — findings queryable by control family, status, and run |
 | CA-7 | Yes | — | Repeated runs with completeness enforcement: a continuous-monitoring capability, not a one-off script |
-| AU-9 / AU-12(3) | Yes | — | Evidence integrity — immutable `run_id` stamping plus raw↔staged reconciliation protect the record from silent alteration |
+| AU-9 / AU-12(3) | Yes | — | Evidence integrity — `run_id` stamping ties every row to its collection run; raw↔staged reconciliation makes any row-count change between landed and staged evidence a build failure |
 
 Commercial crosswalk: the completeness and reconciliation tests are SOX ITGC vocabulary — completeness & accuracy (C&A) over evidence populations — applied to continuous monitoring instead of a quarterly population pull.
 
@@ -58,19 +58,19 @@ Commercial crosswalk: the completeness and reconciliation tests are SOX ITGC voc
 The dbt tests aren't code hygiene — they are the control implementation:
 
 - **Completeness** — every `run_id` is compared against an expected-sources manifest (a dbt seed). A collector that silently fails to report **fails the build**, converting a silent evidence gap into a loud pipeline failure.
-- **Reconciliation** — raw row counts are reconciled to staged row counts per run. If staging drops or duplicates rows, downstream evidence no longer matches what was collected — a chain-of-custody break that would otherwise stay invisible until an auditor re-performs the work.
+- **Reconciliation** — raw row counts are reconciled to staged row counts per run; a divergence fails the build — a chain-of-custody break caught in the pipeline instead of during an auditor's re-performance.
 - **Schema tests** — `not_null`, `accepted_values`, uniqueness. A finding without a `resource_id`, or with status `PASSED` instead of `PASS`, is evidence that can't be traced or aggregated. These pin the contract at the data layer, not just in a docs file.
 
 ## How an Auditor Uses This Output
 
-When an assessor asks "show me the complete population of security checks run in this period," `fct_findings` answers it directly: filter by `run_id`, group by control family or status, and the completeness test result *proves* no collector is silently missing from the population — the question auditors otherwise resolve through sampling and re-performance. The reconciliation tests demonstrate the transformation from raw collector output to the reviewed findings table is lossless, and `dbt docs` renders the full lineage from declared source to mart, so the path from API call to finding is inspectable rather than asserted.
+When an assessor asks "show me the complete population of security checks run in this period," `fct_findings` answers it directly: filter by `run_id`, group by control family or status, and the completeness test result *proves* no collector is silently missing from the population — the question auditors otherwise resolve through sampling and re-performance. That proof is scoped honestly: a green build shows every expected source contributed findings to the run — it does not cover what each collector can see (known producer blind spots are documented per source in `contracts/`), and how a legitimately zero-finding source is represented is an open design decision ([#14](https://github.com/0xBahalaNa/grc-engineering-evidence-warehouse/issues/14)). The reconciliation tests compare raw to staged row counts per run, so a transformation that changes the row count between raw and staged fails the build instead of reaching an auditor, and `dbt docs` renders the full lineage from declared source to mart, so the path from API call to finding is inspectable rather than asserted.
 
-This slots into the broader evidence loop as the transform-retain-review layers: producers detect, the warehouse lands raw records immutably (`run_id`, `loaded_at`), transforms them under test, and serves the review surface (AU-6) that turns collector output into audit-record analysis.
+This slots into the broader evidence loop as the transform-retain-review layers: producers detect, the warehouse lands raw records stamped with `run_id` and `loaded_at`, transforms them under test, and serves the review surface (AU-6) that turns collector output into audit-record analysis.
 
 ## FedRAMP 20x Alignment
 
 - **Compliance-as-code:** the completeness and reconciliation controls are encoded as dbt tests that gate the build — control failure is pipeline failure
-- **Machine-readable evidence:** published JSON contracts per source; findings land in a queryable mart instead of terminal output
+- **Machine-readable evidence:** a published contract per source (`contracts/`, versioned markdown) with conforming JSON fixtures; findings land in a queryable mart instead of terminal output. Machine-enforceable JSON Schema in CI is v1.1 — dbt schema tests pin the contract at the data layer today
 - **Continuous monitoring:** run-versioned evidence with completeness enforcement across repeated runs (CA-7)
 - **API-driven evidence:** DuckDB + dbt expose the findings model to any downstream consumer — reporting, OSCAL transformation, or dashboarding
 
@@ -80,17 +80,23 @@ A `fct_findings` excerpt (v1.0 target shape, built from checked-in fixtures):
 
 | source | check_id | resource_id | status | control_ids | run_id | collected_at |
 |---|---|---|---|---|---|---|
-| s3_audit | s3_default_encryption | app-logs-bucket | FAIL | SC-28 | 20260714T090000Z | 2026-07-14T09:00:12Z |
-| sg_audit | sg_open_ingress_risky_port | sg-0a1b2c3d4e5f6a7b8 | FAIL | SC-7 | 20260714T090000Z | 2026-07-14T09:01:03Z |
-| cloudtrail_audit | ct_root_account_usage | root | WARN | AU-2, AC-6(9) | 20260714T090000Z | 2026-07-14T09:02:41Z |
-| evidence_logger | iam_policy_wildcard_action | AdminAccess-inline | FAIL | AC-6 | 20260714T090000Z | 2026-07-14T09:03:15Z |
+| s3_audit | s3-bucket-encryption-enabled | backups-unencrypted | FAIL | SC-28 | 20260715T130000Z | 2026-07-15T12:00:00Z |
+| sg_audit | open-to-internet-risky-port | sg-0abc123def456789a | FAIL | SC-7 | 20260715T130000Z | 2026-07-15T12:00:00Z |
+| cloudtrail_audit | root-account-usage | ACCOUNT | FAIL | AU-2, AC-6(9) | 20260715T130000Z | 2026-07-14T21:00:00Z |
+| evidence_logger | wildcard-action | DangerousAdmin | FAIL | AC-6 | 20260715T130000Z | 2026-07-14T21:00:00Z |
 
-And the control doing its job — a completeness test failing the build because one collector didn't report:
+`status` above is the **normalized** mart value (`CRITICAL`→`FAIL` for root usage).
+`control_ids` is the `dim_controls` join output — not carried in raw fixtures — and the
+join is **one-to-many**: a single check can evidence several controls (root usage above).
+`collected_at` is the producer's collection time (per the checked-in fixtures); `run_id`
+stamps the load, so it always postdates the evidence it carries.
+
+And the control doing its job — on the **next** run, `sg_audit` fails to report, and the completeness test fails the build rather than letting the population go quietly short:
 
 ```
 FAIL 1 completeness_expected_sources
   Source 'sg_audit' is in the expected-sources manifest but absent
-  from run_id 20260714T090000Z — evidence population incomplete.
+  from run_id 20260716T090000Z — evidence population incomplete.
 ```
 
 ## Requirements

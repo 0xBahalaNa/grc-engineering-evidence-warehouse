@@ -1,0 +1,26 @@
+[
+  {
+    "source": "s3_audit",
+    "check_id": "s3-bucket-public-access-block-all-enabled",
+    "resource_id": "logs-bucket-prod",
+    "status": "WARN",
+    "collected_at": "2026-07-15T12:00:00Z",
+    "enc_type": null
+  },
+  {
+    "source": "s3_audit",
+    "check_id": "s3-bucket-encryption-enabled",
+    "resource_id": "backups-unencrypted",
+    "status": "FAIL",
+    "collected_at": "2026-07-15T12:00:00Z",
+    "enc_type": null
+  },
+  {
+    "source": "s3_audit",
+    "check_id": "s3-bucket-encryption-enabled",
+    "resource_id": "app-data-encrypted",
+    "status": "PASS",
+    "collected_at": "2026-07-15T12:00:00Z",
+    "enc_type": "AES256"
+  }
+]
