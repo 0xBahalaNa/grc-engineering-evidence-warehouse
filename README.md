@@ -107,6 +107,7 @@ FAIL 1 completeness_expected_sources
 ## Usage
 
 ```bash
+mkdir -p raw && cp fixtures/*.json raw/    # landing dir (fixtures stay immutable)
 python ingest/load_raw.py --raw-dir raw/   # EL: land JSON into DuckDB raw schema (run_id + loaded_at)
 dbt build                                  # models + tests — the control layer gates here
 dbt docs generate && dbt docs serve        # browse source → staging → mart lineage
