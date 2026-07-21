@@ -6,7 +6,7 @@
 ![dbt](https://img.shields.io/badge/dbt-duckdb-FF694B?style=flat)
 ![DuckDB](https://img.shields.io/badge/DuckDB-warehouse-fff100?style=flat)
 
-# GRC Engineering Evidence Warehouse
+# Evidence Warehouse
 
 The missing layer *after* the audit scripts run. Four producer repos ([`s3-audit`](https://github.com/0xBahalaNa/s3-audit), [`sg-audit`](https://github.com/0xBahalaNa/sg-audit), [`cloudtrail-audit`](https://github.com/0xBahalaNa/cloudtrail-audit), [`evidence-logger`](https://github.com/0xBahalaNa/evidence-logger)) each check a slice of an AWS account and report findings — and the findings evaporate at the terminal. This warehouse treats audit evidence as a data product: producer outputs land as raw records in DuckDB, dbt stages and unifies them into a queryable findings model, dbt tests enforce that the evidence population is complete and reconciled, and dbt docs publish the lineage from API call to finding.
 
@@ -63,7 +63,7 @@ The dbt tests aren't code hygiene — they are the control implementation:
 
 ## How an Auditor Uses This Output
 
-When an assessor asks "show me the complete population of security checks run in this period," `fct_findings` answers it directly: filter by `run_id`, group by control family or status, and the completeness test result *proves* no collector is silently missing from the population — the question auditors otherwise resolve through sampling and re-performance. That proof is scoped honestly: a green build shows every expected source contributed findings to the run — it does not cover what each collector can see (known producer blind spots are documented per source in `contracts/`), and how a legitimately zero-finding source is represented is an open design decision ([#14](https://github.com/0xBahalaNa/grc-engineering-evidence-warehouse/issues/14)). The reconciliation tests compare raw to staged row counts per run, so a transformation that changes the row count between raw and staged fails the build instead of reaching an auditor, and `dbt docs` renders the full lineage from declared source to mart, so the path from API call to finding is inspectable rather than asserted.
+When an assessor asks "show me the complete population of security checks run in this period," `fct_findings` answers it directly: filter by `run_id`, group by control family or status, and the completeness test result *proves* no collector is silently missing from the population — the question auditors otherwise resolve through sampling and re-performance. That proof is scoped honestly: a green build shows every expected source contributed findings to the run — it does not cover what each collector can see (known producer blind spots are documented per source in `contracts/`), and how a legitimately zero-finding source is represented is an open design decision ([#14](https://github.com/0xBahalaNa/evidence-warehouse/issues/14)). The reconciliation tests compare raw to staged row counts per run, so a transformation that changes the row count between raw and staged fails the build instead of reaching an auditor, and `dbt docs` renders the full lineage from declared source to mart, so the path from API call to finding is inspectable rather than asserted.
 
 This slots into the broader evidence loop as the transform-retain-review layers: producers detect, the warehouse lands raw records stamped with `run_id` and `loaded_at`, transforms them under test, and serves the review surface (AU-6) that turns collector output into audit-record analysis.
 
@@ -116,7 +116,7 @@ dbt docs generate && dbt docs serve        # browse source → staging → mart 
 ## Repository Structure
 
 ```
-grc-engineering-evidence-warehouse/
+evidence-warehouse/
 ├── contracts/            # findings schema per source — the published contract
 ├── fixtures/             # checked-in JSON conforming to contracts (permanent test data)
 ├── ingest/               # thin Python EL loader
