@@ -9,6 +9,9 @@
 *.duckdb.wal
 *.duckdb.tmp/
 
+# Landing copy of fixtures (cp fixtures/*.json raw/); not committed
+/raw/
+
 # Python
 /.venv/
 __pycache__/
