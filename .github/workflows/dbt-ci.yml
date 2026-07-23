@@ -35,5 +35,28 @@ jobs:
       - name: Install dbt packages
         run: dbt deps
 
+      - name: Load fixtures into DuckDB
+        run: |
+          mkdir -p raw
+          cp fixtures/*.json raw/
+          python ingest/load_raw.py --raw-dir raw/
+
       - name: Build
         run: dbt build
+
+      # Views only fail ELSE error()/bad SQL on SELECT — dbt build creating the
+      # view is not enough (B3). Force a full read of each staging model.
+      - name: Smoke-select staging views
+        run: |
+          python - <<'PY'
+          import duckdb
+          con = duckdb.connect("evidence_warehouse.duckdb", read_only=True)
+          for model in (
+              "stg_s3_audit",
+              "stg_sg_audit",
+              "stg_cloudtrail_audit",
+              "stg_evidence_logger",
+          ):
+              con.execute(f"select * from main.{model}").fetchall()
+              print(f"ok: {model}")
+          PY
