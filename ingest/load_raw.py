@@ -1,10 +1,10 @@
 """Thin EL loader: land producer JSON into DuckDB raw.* with run metadata.
 
 Extract-and-load only — no rename/status/'N/A' normalization. Staging (#4)
-owns transform, including ISO-8601 → timestamptz casts. Timestamps land as
-verbatim VARCHAR (see read_json timestampformat pin below) so raw never
-materializes a naive TIMESTAMP. Honors EVIDENCE_DB_PATH with the same
-semantics as profiles.yml (D8).
+owns transform, including ISO-8601 → timestamptz casts. Finding columns land
+as VARCHAR (D11): validate parses JSON once, then CREATE TABLE + INSERT from
+that in-memory list — no second disk read after DROP SCHEMA (AU-12(3)/AU-9).
+Honors EVIDENCE_DB_PATH with the same semantics as profiles.yml (D8).
 """
 
 from __future__ import annotations
@@ -20,7 +20,15 @@ from typing import Any
 
 import duckdb
 
+# File stem -> raw.<stem>; must be a bare DuckDB identifier (unquoted in SQL).
 _TABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# Keys spliced into CREATE TABLE column lists — allowlist only (B1).
+# Permits hyphen / dot / colon / reserved-word keys from prior B4/B5 cases;
+# rejects quote, brace, comma, whitespace, and control characters.
+_SAFE_JSON_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.:-]*$")
+# Loader-owned stamps — must not appear in landing JSON (_core.md), any case (B2).
+_RESERVED_STAMP_KEYS = frozenset({"run_id", "loaded_at"})
+_RESERVED_STAMP_FOLDS = frozenset(k.casefold() for k in _RESERVED_STAMP_KEYS)
 
 
 class DuplicateKeyError(ValueError):
@@ -69,62 +77,127 @@ def resolve_db_path() -> str:
     return "evidence_warehouse.duckdb"
 
 
-def load_source(conn: duckdb.DuckDBPyConnection, path: Path, run_id: str, loaded_at: datetime) -> int:
+def _finding_keys(path: Path, data: list[Any]) -> list[str]:
+    """Validate finding rows/keys (B1/B2/B4/B5); return sorted unique keys."""
+    keys: set[str] = set()
+    folded: dict[str, str] = {}
+    for i, row in enumerate(data):
+        if not isinstance(row, dict):
+            sys.exit(
+                f"{path}: expected finding objects (JSON objects), "
+                f"got {type(row).__name__} at index {i}"
+            )
+        for key in row:
+            if not _SAFE_JSON_KEY_RE.fullmatch(key):
+                sys.exit(
+                    f"{path}: refusing JSON key outside safe-identifier "
+                    f"allowlist: {key!r}"
+                )
+            if key.casefold() in _RESERVED_STAMP_FOLDS:
+                sys.exit(
+                    f"{path}: reserved stamp key {key!r} must not appear in "
+                    "landing data (loader stamps run_id / loaded_at)"
+                )
+            fold = key.casefold()
+            prior = folded.get(fold)
+            if prior is not None and prior != key:
+                sys.exit(
+                    f"{path}: case-colliding JSON keys {prior!r} and {key!r}"
+                )
+            folded[fold] = key
+            keys.add(key)
+    if not keys:
+        sys.exit(f"{path}: finding objects have no keys")
+    return sorted(keys)
+
+
+def _varchar_column_defs(keys: list[str]) -> str:
+    """Build CREATE TABLE column defs with double-quoted keys (D11 / B4 / B5)."""
+    return ", ".join(f'"{key}" VARCHAR' for key in keys)
+
+
+def _row_values(row: dict[str, Any], keys: list[str]) -> list[Any]:
+    """Coerce one finding to VARCHAR-pinned param values (D11); None stays NULL."""
+    vals: list[Any] = []
+    for key in keys:
+        value = row.get(key)
+        if value is None:
+            vals.append(None)
+        elif isinstance(value, str):
+            vals.append(value)
+        else:
+            vals.append(str(value))
+    return vals
+
+
+def load_source(
+    conn: duckdb.DuckDBPyConnection,
+    path: Path,
+    run_id: str,
+    loaded_at: datetime,
+    data: list[Any],
+) -> int:
     """
-    Load one JSON file into raw.<stem>, or skip if absent/empty.
+    Load validated findings into raw.<stem> from the in-memory list.
 
-    Returns number of rows loaded (0 if skipped).
+    Returns number of rows loaded. Caller must pass the list returned by
+    _validate_landing_file — this path never re-reads disk after DROP (S1/B1).
     """
-    # If path does not exist, return 0.
-    if not path.exists():
-        return 0
-
-    # If file size is 0, return 0.
-    if path.stat().st_size == 0:
-        return 0
-
-    # Empty array => absent source (interim #14 representation — keep skip).
-    # Non-list => hard error (contract violation, not "absent").
-    data = _load_json(path)
-
     if not isinstance(data, list):
-        sys.exit(f"{path}: expected a JSON array of findings, got {type(data).__name__}")
-    if len(data) == 0:
-        return 0
+        raise TypeError(
+            f"load_source requires data=list of findings, got {type(data).__name__}"
+        )
 
     table = path.stem
     if not _TABLE_NAME_RE.fullmatch(table):
         sys.exit(f"Refusing unsafe table name from file stem: {table!r}")
 
-    # Source-agnostic land: DuckDB infers columns from JSON keys; we stamp
-    # run_id + loaded_at only. timestampformat is a deliberate never-match pin
-    # so ISO-8601 strings (collected_at / event_time) land as VARCHAR verbatim
-    # instead of naive TIMESTAMP — staging owns the timestamptz cast (B1 / D9).
-    # sample_size=-1: type from the full file, not the 20_480-row sample window (F2).
+    # Source-agnostic land: pin every finding key to VARCHAR (D11) and INSERT
+    # from the validated in-memory list — not a second read_json of path.
+    # Keys are double-quoted so reserved words / hyphen / dot / colon keys land;
+    # validation already enforced the allowlist, reserved stamps
+    # (case-insensitive), and case collisions. Stamp run_id + loaded_at only —
+    # no transform.
+    keys = _finding_keys(path, data)
+    col_defs = _varchar_column_defs(keys)
     conn.execute(
         f"""
-        CREATE OR REPLACE TABLE raw.{table} AS
-        SELECT *, ? AS run_id, ?::TIMESTAMPTZ AS loaded_at
-        FROM read_json(
-            ?,
-            format='array',
-            timestampformat='%m/%d/%Y %H:%M:%S',
-            sample_size=-1
+        CREATE OR REPLACE TABLE raw.{table} (
+            {col_defs},
+            run_id VARCHAR,
+            loaded_at TIMESTAMPTZ
         )
-        """,
-        [run_id, loaded_at, str(path)],
+        """
     )
+    col_list = ", ".join(f'"{key}"' for key in keys) + ", run_id, loaded_at"
+    placeholders = ", ".join(["?"] * (len(keys) + 2))
+    insert_sql = f"INSERT INTO raw.{table} ({col_list}) VALUES ({placeholders})"
+    params = [
+        _row_values(row, keys) + [run_id, loaded_at]
+        for row in data
+    ]
+    conn.executemany(insert_sql, params)
     return len(data)
 
 
-def _validate_landing_file(path: Path) -> None:
-    """Parse + stem-check one landing file; abort before any schema mutation."""
+def _validate_landing_file(path: Path) -> list[Any] | None:
+    """
+    Full landing gate — MUST run before DROP SCHEMA so a bad file cannot wipe raw.*.
+
+    Returns the parsed findings list for load_source to reuse (S1), or None when
+    the file is an empty array (absent source — skip, no key checks).
+    """
     table = path.stem
     if not _TABLE_NAME_RE.fullmatch(table):
         sys.exit(f"Refusing unsafe table name from file stem: {table!r}")
     data = _load_json(path)
     if not isinstance(data, list):
         sys.exit(f"{path}: expected a JSON array of findings, got {type(data).__name__}")
+    # Empty array = absent source; no key checks.
+    if len(data) == 0:
+        return None
+    _finding_keys(path, data)
+    return data
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -149,9 +222,13 @@ def main(argv: list[str] | None = None) -> int:
 
     landing_files = sorted(raw_dir.glob("*.json"))
     # Pre-validate before DROP so a bad file cannot wipe prior raw.* (S4 / F1).
+    # Keep the parsed payloads so load_source does not re-read after DROP (S1).
+    validated: dict[Path, list[Any]] = {}
     for path in landing_files:
         if path.exists() and path.stat().st_size > 0:
-            _validate_landing_file(path)
+            data = _validate_landing_file(path)
+            if data is not None:
+                validated[path] = data
 
     conn = duckdb.connect(db_path)
     try:
@@ -161,9 +238,12 @@ def main(argv: list[str] | None = None) -> int:
 
         total = 0
         for path in landing_files:
-            n = load_source(conn, path, run_id, loaded_at)
+            if path not in validated:
+                print(f"{path.name}: skipped (absent/empty)")
+                continue
+            n = load_source(conn, path, run_id, loaded_at, data=validated[path])
             total += n
-            print(f"{path.name}: {n} rows -> raw.{path.stem}" if n else f"{path.name}: skipped (absent/empty)")
+            print(f"{path.name}: {n} rows -> raw.{path.stem}")
 
         print(f"run_id={run_id} loaded_at={loaded_at.isoformat()} rows={total} db={db_path}")
     finally:
