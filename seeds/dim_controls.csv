@@ -1,0 +1,68 @@
+source,check_id,framework,control_id
+s3_audit,s3-bucket-encryption-enabled,NIST 800-53 Rev 5,SC-28
+s3_audit,s3-bucket-encryption-enabled,NIST 800-53 Rev 5,SC-28(1)
+s3_audit,s3-bucket-encryption-enabled,FedRAMP High,SC-28
+s3_audit,s3-bucket-encryption-enabled,FedRAMP High,SC-28(1)
+s3_audit,s3-bucket-encryption-enabled,CJIS v6.0,SC-28
+s3_audit,s3-bucket-public-access-block-all-enabled,NIST 800-53 Rev 5,AC-3
+s3_audit,s3-bucket-public-access-block-all-enabled,NIST 800-53 Rev 5,AC-21
+s3_audit,s3-bucket-public-access-block-all-enabled,NIST 800-53 Rev 5,CM-6
+s3_audit,s3-bucket-public-access-block-all-enabled,FedRAMP High,AC-3
+s3_audit,s3-bucket-public-access-block-all-enabled,FedRAMP High,AC-21
+s3_audit,s3-bucket-public-access-block-all-enabled,FedRAMP High,CM-6
+sg_audit,open-to-internet-risky-port,NIST 800-53 Rev 5,SC-7
+sg_audit,open-to-internet-risky-port,NIST 800-53 Rev 5,SC-7(3)
+sg_audit,open-to-internet-risky-port,NIST 800-53 Rev 5,AC-3
+sg_audit,open-to-internet-risky-port,NIST 800-53 Rev 5,AC-4
+sg_audit,open-to-internet-risky-port,NIST 800-53 Rev 5,CM-7
+sg_audit,open-to-internet-risky-port,FedRAMP High,SC-7
+sg_audit,open-to-internet-risky-port,FedRAMP High,SC-7(3)
+sg_audit,open-to-internet-risky-port,FedRAMP High,AC-3
+sg_audit,open-to-internet-risky-port,FedRAMP High,AC-4
+sg_audit,open-to-internet-risky-port,FedRAMP High,CM-7
+sg_audit,open-to-internet-risky-port,CJIS v6.0,SC-7
+sg_audit,open-to-internet-nonrisky-port,NIST 800-53 Rev 5,SC-7
+sg_audit,open-to-internet-nonrisky-port,NIST 800-53 Rev 5,AC-3
+sg_audit,open-to-internet-nonrisky-port,NIST 800-53 Rev 5,AC-4
+sg_audit,open-to-internet-nonrisky-port,FedRAMP High,SC-7
+sg_audit,open-to-internet-nonrisky-port,FedRAMP High,AC-3
+sg_audit,open-to-internet-nonrisky-port,FedRAMP High,AC-4
+sg_audit,open-to-internet-nonrisky-port,CJIS v6.0,SC-7
+cloudtrail_audit,root-account-usage,NIST 800-53 Rev 5,IA-2
+cloudtrail_audit,root-account-usage,NIST 800-53 Rev 5,AU-6
+cloudtrail_audit,root-account-usage,NIST 800-53 Rev 5,SI-4
+cloudtrail_audit,root-account-usage,NIST 800-53 Rev 5,AU-2
+cloudtrail_audit,root-account-usage,NIST 800-53 Rev 5,AC-6(9)
+cloudtrail_audit,root-account-usage,FedRAMP High,IA-2
+cloudtrail_audit,root-account-usage,FedRAMP High,AU-6
+cloudtrail_audit,root-account-usage,FedRAMP High,SI-4
+cloudtrail_audit,root-account-usage,FedRAMP High,AU-2
+cloudtrail_audit,root-account-usage,FedRAMP High,AC-6(9)
+cloudtrail_audit,root-account-usage,CJIS v6.0,AU-6
+cloudtrail_audit,failed-api-call,NIST 800-53 Rev 5,AU-6
+cloudtrail_audit,failed-api-call,NIST 800-53 Rev 5,SI-4
+cloudtrail_audit,failed-api-call,NIST 800-53 Rev 5,AU-2
+cloudtrail_audit,failed-api-call,FedRAMP High,AU-6
+cloudtrail_audit,failed-api-call,FedRAMP High,SI-4
+cloudtrail_audit,failed-api-call,FedRAMP High,AU-2
+cloudtrail_audit,failed-api-call,CJIS v6.0,AU-6
+cloudtrail_audit,sensitive-api-call,NIST 800-53 Rev 5,AU-6
+cloudtrail_audit,sensitive-api-call,NIST 800-53 Rev 5,AU-12
+cloudtrail_audit,sensitive-api-call,NIST 800-53 Rev 5,SI-4
+cloudtrail_audit,sensitive-api-call,NIST 800-53 Rev 5,AU-2
+cloudtrail_audit,sensitive-api-call,FedRAMP High,AU-6
+cloudtrail_audit,sensitive-api-call,FedRAMP High,AU-12
+cloudtrail_audit,sensitive-api-call,FedRAMP High,SI-4
+cloudtrail_audit,sensitive-api-call,FedRAMP High,AU-2
+cloudtrail_audit,sensitive-api-call,CJIS v6.0,AU-6
+cloudtrail_audit,console-login,NIST 800-53 Rev 5,AU-6
+cloudtrail_audit,console-login,NIST 800-53 Rev 5,IA-2
+cloudtrail_audit,console-login,NIST 800-53 Rev 5,AU-2
+cloudtrail_audit,console-login,FedRAMP High,AU-6
+cloudtrail_audit,console-login,FedRAMP High,IA-2
+cloudtrail_audit,console-login,FedRAMP High,AU-2
+cloudtrail_audit,console-login,CJIS v6.0,AU-6
+evidence_logger,wildcard-action,NIST 800-53 Rev 5,AC-6
+evidence_logger,wildcard-action,FedRAMP High,AC-6
+evidence_logger,wildcard-resource,NIST 800-53 Rev 5,AC-3
+evidence_logger,wildcard-resource,FedRAMP High,AC-3
