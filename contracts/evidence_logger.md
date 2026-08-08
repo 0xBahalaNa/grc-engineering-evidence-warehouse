@@ -37,13 +37,25 @@ reflect what the producer actually detects against `test_policy.json`.
 
 ## resource_id semantics
 
-Policy statement `Sid` when present; otherwise the string `'None'` (producer renders
-optional Sid that way). The v1.0 fixture's `test_policy.json` has two statements
-(`AllowS3Read`, `DangerousAdmin`); both findings come from the **single**
-`DangerousAdmin` statement failing two checks (`Action` and `Resource`), so both
-fixture rows carry `resource_id: DangerousAdmin`. Weak/synthetic identifier — the
-real audited artifact is `policy_file` (extension). See also issue #11 for Sid-less
-grain risk.
+Policy statement `Sid` when present; otherwise the producer renders optional Sid
+as the literal string `'None'` (an f-string artifact of `statement.get('Sid')`
+returning Python `None`). **Fixtures store that sentinel verbatim** (raw-in);
+**staging normalizes `'None'` → `NULL`** via `nullif` — the same
+raw-in / normalized-out doctrine CloudTrail applies to `'N/A'`. A Sid-less
+statement genuinely has no primary subject identifier; forcing a non-null value
+collapses every Sid-less finding onto one shared subject.
+
+The v1.0 fixtures include both shapes: two rows from `DangerousAdmin` on
+`test_policy.json` (`resource_id: DangerousAdmin`), and one Sid-less row on
+`no_sid_policy.json` (`resource_id: "None"` → `NULL` after staging).
+Weak/synthetic identifier when present — the real audited artifact is
+`policy_file` (extension). Natural key is
+`(check_id, resource_id, policy_file, violated_attribute)` (see `_core.md`
+Finding identity). **Known limit:** two Sid-less statements that fail the same
+check in one file are distinct findings but share that key after `'None'` →
+`NULL`, so `tests/unique_stg_evidence_logger.sql` red-builds on valid evidence.
+Fixing it needs a producer-side statement index at `--json` retrofit; a
+synthetic ordinal is rejected.
 
 ## Extension fields (mandatory)
 

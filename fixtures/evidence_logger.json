@@ -18,5 +18,15 @@
     "policy_file": "test_policy.json",
     "violated_attribute": "Resource",
     "raw_message": "[FAIL] Statement \"DangerousAdmin\": Resource is \"*\""
+  },
+  {
+    "source": "evidence_logger",
+    "check_id": "wildcard-action",
+    "resource_id": "None",
+    "status": "FAIL",
+    "collected_at": "2026-07-14T21:00:00Z",
+    "policy_file": "no_sid_policy.json",
+    "violated_attribute": "Action",
+    "raw_message": "[FAIL] Statement \"None\": Action is \"*\""
   }
 ]

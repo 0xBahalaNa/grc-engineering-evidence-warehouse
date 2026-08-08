@@ -36,15 +36,27 @@ window the producer analyzes the **newest 50** and the **oldest events in the wi
 are silently dropped**. Findings from this source are a truncated slice, **not the
 population**.
 
-This gap is invisible to the warehouse's own completeness test:
-`completeness_expected_sources` proves the source **reported** in a given `run_id` —
-it does not prove the source reported **everything**. A run where root activity fell
-outside the newest-50 slice still builds green. Gaps of this class are recorded
-throughout `contracts/` — e.g. `sg_audit.md` (IPv4-only rule reads), `evidence_logger.md`
-(undetected wildcard forms) — because producer-side coverage is outside what this
-warehouse's tests can assert. Recorded here, not fixed: pagination belongs to the producer's `--json`
-retrofit (`cloudtrail-audit`), and until then `cloudtrail_audit` evidence is complete
-only with respect to its page-one window.
+This gap will be invisible to the planned completeness test (#6): that test will
+prove the source **reported** in a given `run_id` (via `raw.load_manifest`), not
+that it reported **everything**. A run where root activity fell outside the
+newest-50 slice will still build green on completeness. Gaps of this class are
+recorded throughout `contracts/` — e.g. `sg_audit.md` (IPv4-only rule reads),
+`evidence_logger.md` (undetected wildcard forms) — because producer-side coverage
+is outside what this warehouse's tests can assert. Recorded here, not fixed:
+pagination belongs to the producer's `--json` retrofit (`cloudtrail-audit`), and
+until then `cloudtrail_audit` evidence is complete only with respect to its
+page-one window.
+
+## Finding identity (declared gap)
+
+**No natural key is available for this source.** The producer emits no CloudTrail
+`eventID` (or equivalent stable event identifier). A composite of
+`(check_id, resource_id, event_time, event_name)` can still collide — two identical
+API calls in the same second are a real occurrence, not a hypothetical. v1.0
+therefore ships **no uniqueness test** on `stg_cloudtrail_audit`; inventing a
+load ordinal or hash would make the test vacuously green. The producer `--json`
+retrofit must carry `eventID` before uniqueness can be enforced. See also
+`contracts/_core.md` ## Finding identity.
 
 ## resource_id semantics
 

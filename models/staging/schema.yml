@@ -1,0 +1,99 @@
+version: 2
+
+models:
+  - name: stg_s3_audit
+    description: >
+      Staging for s3_audit findings. Casts collected_at to timestamptz.
+      Status is passed through from raw (fixtures already use PASS/WARN/FAIL);
+      accepted_values pins the vocabulary here. Natural key (enforced in tests/):
+      (check_id, resource_id).
+    columns:
+      - name: check_id
+        description: Kebab-case check catalog id; dim_controls join key with source.
+      - name: resource_id
+        description: Primary subject — S3 bucket name (or ARN-shaped id per contract).
+        tests: [not_null]
+      - name: status
+        description: Check outcome domain (PASS / WARN / FAIL).
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['PASS', 'WARN', 'FAIL']
+      - name: run_id
+        description: Provenance stamp from the loader for this single-run snapshot.
+
+  - name: stg_sg_audit
+    description: >
+      Staging for sg_audit findings. Natural key (PARTIAL — no ip_protocol; see
+      contracts/_core.md Finding identity):
+      (check_id, resource_id, from_port, to_port, cidr_ip).
+    columns:
+      - name: check_id
+        description: Kebab-case check catalog id; dim_controls join key with source.
+      - name: resource_id
+        description: Primary subject — security group id.
+        tests: [not_null]
+      - name: from_port
+        description: Rule start port (string per contract; may be All).
+      - name: to_port
+        description: Rule end port (string per contract; may be All).
+      - name: cidr_ip
+        description: IPv4 CIDR on the rule (producer is IPv4-only).
+      - name: status
+        description: Check outcome domain (PASS / WARN / FAIL).
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['PASS', 'WARN', 'FAIL']
+      - name: run_id
+        description: Provenance stamp from the loader for this single-run snapshot.
+
+  - name: stg_cloudtrail_audit
+    description: >
+      Staging for cloudtrail_audit findings. Normalizes status (CRITICAL→FAIL,
+      WARN→WARN, INFO→WARN) and 'N/A' sentinels on principal/source_ip to NULL.
+      No uniqueness test — the producer emits no eventID; see contracts/_core.md
+      Finding identity and contracts/cloudtrail_audit.md.
+    columns:
+      - name: check_id
+        description: Kebab-case check catalog id; dim_controls join key with source.
+      - name: resource_id
+        description: Primary subject via contract fallback (ACCOUNT / principal / event_source).
+        tests: [not_null]
+      - name: status
+        description: Normalized check outcome (PASS / WARN / FAIL).
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['PASS', 'WARN', 'FAIL']
+      - name: native_severity
+        description: Raw CRITICAL/WARN/INFO preserved before lossy status map.
+      - name: run_id
+        description: Provenance stamp from the loader for this single-run snapshot.
+
+  - name: stg_evidence_logger
+    description: >
+      Staging for evidence_logger findings. Normalizes Sid-less resource_id
+      sentinel 'None' → NULL (same raw-in / normalized-out doctrine as CloudTrail
+      'N/A'). Natural key (enforced in tests/):
+      (check_id, resource_id, policy_file, violated_attribute).
+      resource_id has no not_null here — D4 / #11 Sid-less case.
+    columns:
+      - name: check_id
+        description: Kebab-case check catalog id; dim_controls join key with source.
+      - name: resource_id
+        description: >
+          Policy statement Sid when present; NULL after nullif when the producer
+          rendered optional Sid as the string 'None'. Nullable by design (D4).
+      - name: policy_file
+        description: Audited policy artifact path/name.
+      - name: violated_attribute
+        description: Action or Resource — which attribute failed the check.
+      - name: status
+        description: Check outcome domain (PASS / WARN / FAIL).
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['PASS', 'WARN', 'FAIL']
+      - name: run_id
+        description: Provenance stamp from the loader for this single-run snapshot.
