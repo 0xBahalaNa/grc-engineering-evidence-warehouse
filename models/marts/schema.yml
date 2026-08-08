@@ -11,9 +11,10 @@ models:
       to N control rows returns N rows. That is intentional — control analysis
       is a join, not a denormalized column on the fact.
 
-      Known limit (#12): no uniqueness constraint on the six core columns.
-      Genuinely distinct findings can share identical core values (e.g. two risky
-      ports on one security group); a surrogate key or uniqueness test is deferred.
+      Finding identity is per-source at staging (see contracts/_core.md
+      ## Finding identity). This mart carries no uniqueness test: the six core
+      columns are a union spine, not a natural key — e.g. two risky ports on one
+      security group share check_id + resource_id at the core grain.
 
       Example — findings by control family:
         select c.control_id, count(*) as finding_count
@@ -31,18 +32,21 @@ models:
         group by status
         order by status;
 
-      Example — findings by run:
+      Example — confirm every finding carries the current run's stamp:
         select run_id, count(*) as finding_count
         from fct_findings
-        group by run_id
-        order by run_id;
+        group by run_id;
+        -- Under single-run snapshot semantics this returns exactly one row
+        -- (the provenance stamp for the load that built the mart).
     columns:
       - name: source
         tests: [not_null]
       - name: check_id
         tests: [not_null]
       - name: resource_id
-        tests: [not_null]
+        # Nullable: evidence_logger Sid-less statements normalize 'None' → NULL
+        # in staging (D4 / #11). A missing Sid is absence of a subject id, not a
+        # value — asserting not_null forced the data to state something false.
       - name: status
         tests:
           - not_null

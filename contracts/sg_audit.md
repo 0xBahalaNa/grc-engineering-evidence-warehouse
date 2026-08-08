@@ -44,6 +44,16 @@ must not read `WARN` as "no risky port exposed."
 
 Security group id (`sg-…`). Strong identifier. Human label lives in the `sg_name` extension.
 
+## Finding identity (partial key)
+
+Natural key enforced at staging:
+`(check_id, resource_id, from_port, to_port, cidr_ip)` —
+`tests/unique_stg_sg_audit.sql`. **Partial:** the producer does not emit
+`ip_protocol`, so tcp/22 and udp/22 on the same SG + CIDR are indistinguishable
+and would red-build if both were present. Declared here and in
+`contracts/_core.md`; adding `ip_protocol` is a contract + `--json` retrofit
+change, not an invented ordinal. See `_core.md` ## Finding identity.
+
 ## Extension fields (mandatory)
 
 | Field | Type | Required | Notes |

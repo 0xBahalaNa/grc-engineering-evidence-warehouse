@@ -29,6 +29,10 @@ _SAFE_JSON_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.:-]*$")
 # Loader-owned stamps — must not appear in landing JSON (_core.md), any case (B2).
 _RESERVED_STAMP_KEYS = frozenset({"run_id", "loaded_at"})
 _RESERVED_STAMP_FOLDS = frozenset(k.casefold() for k in _RESERVED_STAMP_KEYS)
+# Loader-owned raw table — a landing file with this stem would collide (D2 / #14).
+# Compare with casefold — DuckDB unquoted identifiers are case-insensitive (B1).
+_RESERVED_TABLE_NAME = "load_manifest"
+_RESERVED_TABLE_FOLD = _RESERVED_TABLE_NAME.casefold()
 
 
 class DuplicateKeyError(ValueError):
@@ -180,20 +184,57 @@ def load_source(
     return len(data)
 
 
+def write_manifest(
+    conn: duckdb.DuckDBPyConnection,
+    run_id: str,
+    loaded_at: datetime,
+    counts: dict[str, int],
+) -> None:
+    """
+    Write raw.load_manifest — one row per landing file processed.
+
+    counts maps source stem -> findings landed (0 is valid). Same run_id /
+    loaded_at as the finding rows from this invocation.
+    """
+    conn.execute("""
+        CREATE TABLE raw.load_manifest (
+            run_id VARCHAR,
+            source VARCHAR,
+            row_count BIGINT,
+            loaded_at TIMESTAMPTZ
+        )
+    """)
+
+    for source, row_count in counts.items():
+        conn.execute(
+            """
+            INSERT INTO raw.load_manifest (run_id, source, row_count, loaded_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            [run_id, source, row_count, loaded_at],
+        )
+
+
 def _validate_landing_file(path: Path) -> list[Any] | None:
     """
     Full landing gate — MUST run before DROP SCHEMA so a bad file cannot wipe raw.*.
 
     Returns the parsed findings list for load_source to reuse (S1), or None when
-    the file is an empty array (absent source — skip, no key checks).
+    the file is an empty array (caller records row_count=0 in the manifest; no
+    key checks — an empty array carries no keys).
     """
     table = path.stem
     if not _TABLE_NAME_RE.fullmatch(table):
         sys.exit(f"Refusing unsafe table name from file stem: {table!r}")
+    if table.casefold() == _RESERVED_TABLE_FOLD:
+        sys.exit(
+            f"{path}: reserved table name {_RESERVED_TABLE_NAME!r} "
+            "(loader-owned manifest; refuse landing file that would collide)"
+        )
     data = _load_json(path)
     if not isinstance(data, list):
         sys.exit(f"{path}: expected a JSON array of findings, got {type(data).__name__}")
-    # Empty array = absent source; no key checks.
+    # Empty array = reported-with-zero-findings; no key checks (no keys to check).
     if len(data) == 0:
         return None
     _finding_keys(path, data)
@@ -221,14 +262,35 @@ def main(argv: list[str] | None = None) -> int:
     run_id = loaded_at.strftime("%Y%m%dT%H%M%SZ")
 
     landing_files = sorted(raw_dir.glob("*.json"))
+
+    # Pre-DROP stem gate (R-2): reserved name + case-insensitive stem collisions.
+    seen_stems: dict[str, Path] = {}
+    for path in landing_files:
+        folded = path.stem.casefold()
+
+        # B1 — reserved loader table name, any casing
+        if folded == _RESERVED_TABLE_FOLD:
+            sys.exit(
+                f"{path}: reserved table name {_RESERVED_TABLE_NAME!r} "
+                "(loader-owned manifest; refuse landing file that would collide)"
+            )
+
+        # B2 — two files that DuckDB would collapse into one table
+        prior = seen_stems.get(folded)
+        if prior is not None:
+            sys.exit(
+                f"case-colliding landing file stems {prior.name!r} and {path.name!r} "
+                "(DuckDB table names are case-insensitive; refuse before DROP)"
+            )
+        seen_stems[folded] = path
+
     # Pre-validate before DROP so a bad file cannot wipe prior raw.* (S4 / F1).
-    # Keep the parsed payloads so load_source does not re-read after DROP (S1).
-    validated: dict[Path, list[Any]] = {}
+    # Keep parsed payloads so load_source does not re-read after DROP (S1).
+    # None value = empty array → manifest row_count=0, no raw.<source> table.
+    validated: dict[Path, list[Any] | None] = {}
     for path in landing_files:
         if path.exists() and path.stat().st_size > 0:
-            data = _validate_landing_file(path)
-            if data is not None:
-                validated[path] = data
+            validated[path] = _validate_landing_file(path)
 
     conn = duckdb.connect(db_path)
     try:
@@ -237,14 +299,24 @@ def main(argv: list[str] | None = None) -> int:
         conn.execute("CREATE SCHEMA raw")
 
         total = 0
+        # source stem -> rows landed; 0 is a real signal (clean account), not a skip.
+        counts: dict[str, int] = {}
         for path in landing_files:
             if path not in validated:
+                # Zero-byte / unreadable-by-size gate — not a JSON empty array.
                 print(f"{path.name}: skipped (absent/empty)")
                 continue
-            n = load_source(conn, path, run_id, loaded_at, data=validated[path])
+            data = validated[path]
+            if data is None:
+                counts[path.stem] = 0
+                print(f"{path.name}: 0 rows -> manifest only")
+                continue
+            n = load_source(conn, path, run_id, loaded_at, data=data)
+            counts[path.stem] = n
             total += n
             print(f"{path.name}: {n} rows -> raw.{path.stem}")
 
+        write_manifest(conn, run_id, loaded_at, counts)
         print(f"run_id={run_id} loaded_at={loaded_at.isoformat()} rows={total} db={db_path}")
     finally:
         conn.close()

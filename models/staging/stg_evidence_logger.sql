@@ -8,7 +8,7 @@ with padded as (
 select
     source,
     check_id,
-    resource_id,
+    nullif(resource_id, 'None') as resource_id,
     status,
     collected_at::timestamptz as collected_at,
     policy_file,
