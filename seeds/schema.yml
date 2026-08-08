@@ -1,0 +1,45 @@
+version: 2
+
+seeds:
+  - name: dim_controls
+    description: >
+      Producer-sourced control mappings keyed by (source, check_id). One row per
+      framework control; join to fct_findings fans out by design.
+
+      Provenance: every row traces to a producer repo README control table or to
+      this repo's contracts/ (cloudtrail AU-2 / AC-6(9) come from
+      contracts/cloudtrail_audit.md). No mapping is sourced from a control
+      catalog alone — an unsourced mapping is a fabricated control claim.
+
+      CJIS v6.0 coverage is partial by design, mapped only where a producer
+      README states a CJIS obligation: sg_audit SC-7, s3_audit SC-28 (encryption
+      check only), cloudtrail_audit AU-6 (all four checks). Seven of the ten
+      checks carry CJIS; the three that do not are s3-bucket-public-access-block-
+      all-enabled, wildcard-action, and wildcard-resource. The two evidence_logger
+      checks are unmapped because that README's only CJIS cell sits on AU-6, a
+      source-level control there rather than one of its two check-level mappings
+      (AC-6 / AC-3). Absence of a CJIS row means "not mapped from a stated
+      source," never "no CJIS obligation exists."
+
+      CJIS v6.0 is cited by NIST 800-53 Rev 5 control ID, not by the v5.9 policy-
+      area numbering it replaced — a control_id here must resolve in the cjis-v6
+      baseline.
+    config:
+      column_types:
+        source: varchar
+        check_id: varchar
+        framework: varchar
+        control_id: varchar
+    columns:
+      - name: source
+        tests: [not_null]
+      - name: check_id
+        tests: [not_null]
+      - name: framework
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['NIST 800-53 Rev 5', 'FedRAMP High', 'CJIS v6.0']
+      - name: control_id
+        tests: [not_null]

@@ -1,0 +1,55 @@
+version: 2
+
+models:
+  - name: fct_findings
+    description: |
+      Unified findings mart — one row per finding at the six-field common core.
+      Extension fields (enc_type, ports, CloudTrail event detail, policy attrs)
+      remain in staging; join back to stg_* for source-specific detail.
+
+      Joining dim_controls on (source, check_id) fans out: one finding mapped
+      to N control rows returns N rows. That is intentional — control analysis
+      is a join, not a denormalized column on the fact.
+
+      Known limit (#12): no uniqueness constraint on the six core columns.
+      Genuinely distinct findings can share identical core values (e.g. two risky
+      ports on one security group); a surrogate key or uniqueness test is deferred.
+
+      Example — findings by control family:
+        select c.control_id, count(*) as finding_count
+        from fct_findings f
+        join dim_controls c
+          on f.source = c.source and f.check_id = c.check_id
+        where c.framework = 'NIST 800-53 Rev 5'
+          and c.control_id like 'SC-%'
+        group by c.control_id
+        order by c.control_id;
+
+      Example — findings by status:
+        select status, count(*) as finding_count
+        from fct_findings
+        group by status
+        order by status;
+
+      Example — findings by run:
+        select run_id, count(*) as finding_count
+        from fct_findings
+        group by run_id
+        order by run_id;
+    columns:
+      - name: source
+        tests: [not_null]
+      - name: check_id
+        tests: [not_null]
+      - name: resource_id
+        tests: [not_null]
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['PASS', 'WARN', 'FAIL']
+      - name: collected_at
+        tests: [not_null]
+      - name: run_id
+        tests: [not_null]
