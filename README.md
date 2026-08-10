@@ -153,4 +153,4 @@ Audit evidence treated as a data product, with the data-engineering discipline t
 
 ## License
 
-MIT
+MIT. Full text in [LICENSE](LICENSE).
