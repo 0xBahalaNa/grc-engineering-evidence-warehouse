@@ -10,17 +10,20 @@ models:
     columns:
       - name: check_id
         description: Kebab-case check catalog id; dim_controls join key with source.
+        tests: [not_null]
       - name: resource_id
         description: Primary subject — S3 bucket name (or ARN-shaped id per contract).
         tests: [not_null]
       - name: status
         description: Check outcome domain (PASS / WARN / FAIL).
         tests:
+          - not_null
           - accepted_values:
               arguments:
                 values: ['PASS', 'WARN', 'FAIL']
       - name: run_id
         description: Provenance stamp from the loader for this single-run snapshot.
+        tests: [not_null]
 
   - name: stg_sg_audit
     description: >
@@ -30,6 +33,7 @@ models:
     columns:
       - name: check_id
         description: Kebab-case check catalog id; dim_controls join key with source.
+        tests: [not_null]
       - name: resource_id
         description: Primary subject — security group id.
         tests: [not_null]
@@ -42,11 +46,13 @@ models:
       - name: status
         description: Check outcome domain (PASS / WARN / FAIL).
         tests:
+          - not_null
           - accepted_values:
               arguments:
                 values: ['PASS', 'WARN', 'FAIL']
       - name: run_id
         description: Provenance stamp from the loader for this single-run snapshot.
+        tests: [not_null]
 
   - name: stg_cloudtrail_audit
     description: >
@@ -57,12 +63,14 @@ models:
     columns:
       - name: check_id
         description: Kebab-case check catalog id; dim_controls join key with source.
+        tests: [not_null]
       - name: resource_id
         description: Primary subject via contract fallback (ACCOUNT / principal / event_source).
         tests: [not_null]
       - name: status
         description: Normalized check outcome (PASS / WARN / FAIL).
         tests:
+          - not_null
           - accepted_values:
               arguments:
                 values: ['PASS', 'WARN', 'FAIL']
@@ -70,6 +78,7 @@ models:
         description: Raw CRITICAL/WARN/INFO preserved before lossy status map.
       - name: run_id
         description: Provenance stamp from the loader for this single-run snapshot.
+        tests: [not_null]
 
   - name: stg_evidence_logger
     description: >
@@ -81,6 +90,7 @@ models:
     columns:
       - name: check_id
         description: Kebab-case check catalog id; dim_controls join key with source.
+        tests: [not_null]
       - name: resource_id
         description: >
           Policy statement Sid when present; NULL after nullif when the producer
@@ -92,8 +102,10 @@ models:
       - name: status
         description: Check outcome domain (PASS / WARN / FAIL).
         tests:
+          - not_null
           - accepted_values:
               arguments:
                 values: ['PASS', 'WARN', 'FAIL']
       - name: run_id
         description: Provenance stamp from the loader for this single-run snapshot.
+        tests: [not_null]

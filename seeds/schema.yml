@@ -43,3 +43,14 @@ seeds:
                 values: ['NIST 800-53 Rev 5', 'FedRAMP High', 'CJIS v6.0']
       - name: control_id
         tests: [not_null]
+
+  - name: expected_sources
+    description: >
+      Manifest of collectors that must report each run. Completeness joins this
+      seed to raw.load_manifest; values are landing-file stems (path.stem).
+    config:
+      column_types:
+        source: varchar
+    columns:
+      - name: source
+        tests: [not_null, unique]

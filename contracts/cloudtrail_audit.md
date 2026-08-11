@@ -36,16 +36,15 @@ window the producer analyzes the **newest 50** and the **oldest events in the wi
 are silently dropped**. Findings from this source are a truncated slice, **not the
 population**.
 
-This gap will be invisible to the planned completeness test (#6): that test will
-prove the source **reported** in a given `run_id` (via `raw.load_manifest`), not
-that it reported **everything**. A run where root activity fell outside the
-newest-50 slice will still build green on completeness. Gaps of this class are
-recorded throughout `contracts/` — e.g. `sg_audit.md` (IPv4-only rule reads),
-`evidence_logger.md` (undetected wildcard forms) — because producer-side coverage
-is outside what this warehouse's tests can assert. Recorded here, not fixed:
-pagination belongs to the producer's `--json` retrofit (`cloudtrail-audit`), and
-until then `cloudtrail_audit` evidence is complete only with respect to its
-page-one window.
+This gap is invisible to the completeness test: that test proves the source
+**reported** in a given `run_id` (via `raw.load_manifest`), not that it reported
+**everything**. A run where root activity fell outside the newest-50 slice will
+still build green on completeness. Gaps of this class are recorded throughout
+`contracts/` — e.g. `sg_audit.md` (IPv4-only rule reads), `evidence_logger.md`
+(undetected wildcard forms) — because producer-side coverage is outside what this
+warehouse's tests can assert. Recorded here, not fixed: pagination belongs to the
+producer's `--json` retrofit (`cloudtrail-audit`), and until then
+`cloudtrail_audit` evidence is complete only with respect to its page-one window.
 
 ## Finding identity (declared gap)
 
