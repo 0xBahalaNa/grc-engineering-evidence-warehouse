@@ -56,14 +56,17 @@ recreates the `raw` schema, so the warehouse holds **exactly one run at a time**
 
 The loader also writes `raw.load_manifest`: one row per landing file processed
 (including a file that is an empty JSON array, with `row_count = 0`). A source
-**absent from the landing directory** produces **no** manifest row. That table
-**records** the zero-finding load and distinguishes it from an absent collector;
-it is the signal a future completeness test will key on, not itself the
-completeness control. A zero-finding source still leaves no `raw.<source>` table
-(by design — D2), so today's `dbt build` errors on that path until staging
-tolerates a missing raw table (#6). Do not read `row_count = 0` as "the build
-stays green." `row_count` is loader-generated (`BIGINT`), not producer data —
-the deliberate exception to the D11 VARCHAR pin on finding columns.
+**absent from the landing directory** produces **no** manifest row. Completeness
+(`tests/completeness_expected_sources.sql`) joins `seeds/expected_sources.csv` to
+this table — missing collector → build failure; `row_count = 0` → completeness
+**passes** (reported, found nothing). Reconciliation
+(`tests/reconciliation_raw_to_staged.sql`) compares `row_count` to staged
+`count(*)` per `(run_id, source)`. Known limit: a zero-finding source still
+leaves no `raw.<source>` table (by design — D2), so `dbt build` errors on that
+path until staging tolerates a missing raw table (follow-up issue). Do not read
+`row_count = 0` as "the build stays green." `row_count` is loader-generated
+(`BIGINT`), not producer data — the deliberate exception to the D11 VARCHAR pin
+on finding columns.
 
 Multi-run retention (append-only or run-partitioned raw) is a separate design
 change, deferred outside v1.0.
@@ -86,8 +89,9 @@ not a grain key.
 composite built from `(check_id, resource_id, event_time, event_name)` can still
 collide (two identical API calls in the same second). See
 `contracts/cloudtrail_audit.md`; the `--json` retrofit must carry `eventID`.
-`sg_audit` lacks `ip_protocol` (producer does not emit it today) — the staged
-test still catches duplicate identical rules, but not protocol-only duplicates.
+`sg_audit` lacks `ip_protocol` (producer does not emit it today) — tcp/22 and
+udp/22 on the same SG + CIDR share the staged key and **red-build** if both are
+present (false alarm), matching `contracts/sg_audit.md`.
 `evidence_logger` includes `resource_id` (Sid) so two Sid'd statements in one
 file are distinct. **Known limit:** two Sid-less statements failing the same
 check in one file are distinct findings but share the key (`resource_id` is
