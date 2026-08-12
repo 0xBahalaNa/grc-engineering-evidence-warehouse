@@ -1,0 +1,35 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: >
+      Loader-owned landing schema. Dropped and rebuilt on every ingest load
+      (D11); the warehouse holds one run at a time (D12). Not a dbt-managed
+      schema — EL stamps run_id / loaded_at here; all transform lives in staging.
+    tables:
+      - name: s3_audit
+        description: >
+          Raw s3_audit findings landed from fixtures (or a future --json emitter).
+          Schema is loader-owned and rebuilt per load — not retained across runs.
+      - name: sg_audit
+        description: >
+          Raw sg_audit findings landed from fixtures (or a future --json emitter).
+          Schema is loader-owned and rebuilt per load — not retained across runs.
+      - name: cloudtrail_audit
+        description: >
+          Raw cloudtrail_audit findings landed from fixtures (or a future --json
+          emitter). Schema is loader-owned and rebuilt per load — not retained
+          across runs.
+      - name: evidence_logger
+        description: >
+          Raw evidence_logger findings landed from fixtures (or a future --json
+          emitter). Schema is loader-owned and rebuilt per load — not retained
+          across runs.
+      - name: load_manifest
+        description: >
+          Loader assertion of what landed this run: one row per landing file
+          (including empty JSON arrays with row_count = 0). Dropped and rebuilt
+          with the rest of raw on every load (D11). Separates reported-findings /
+          reported-nothing / never-ran (D13); keys both completeness and
+          reconciliation control tests.

@@ -8,6 +8,8 @@ models:
       accepted_values pins the vocabulary here. Natural key (enforced in tests/):
       (check_id, resource_id).
     columns:
+      - name: source
+        description: Producer id — always s3_audit for this model; stored in each row (self-describing).
       - name: check_id
         description: Kebab-case check catalog id; dim_controls join key with source.
         tests: [not_null]
@@ -21,9 +23,17 @@ models:
           - accepted_values:
               arguments:
                 values: ['PASS', 'WARN', 'FAIL']
+      - name: collected_at
+        description: Producer collection time (ISO-8601); cast to timestamptz in staging. Not load time.
+      - name: enc_type
+        description: >
+          SSE algorithm from GetBucketEncryption (AES256, aws:kms, aws:kms:dsse, …).
+          Present on encryption PASS; null otherwise. Non-exhaustive — do not pin accepted_values.
       - name: run_id
         description: Provenance stamp from the loader for this single-run snapshot.
         tests: [not_null]
+      - name: loaded_at
+        description: Loader stamp — when this row landed in raw; distinct from collected_at.
 
   - name: stg_sg_audit
     description: >
@@ -31,18 +41,14 @@ models:
       contracts/_core.md Finding identity):
       (check_id, resource_id, from_port, to_port, cidr_ip).
     columns:
+      - name: source
+        description: Producer id — always sg_audit for this model; stored in each row (self-describing).
       - name: check_id
         description: Kebab-case check catalog id; dim_controls join key with source.
         tests: [not_null]
       - name: resource_id
         description: Primary subject — security group id.
         tests: [not_null]
-      - name: from_port
-        description: Rule start port (string per contract; may be All).
-      - name: to_port
-        description: Rule end port (string per contract; may be All).
-      - name: cidr_ip
-        description: IPv4 CIDR on the rule (producer is IPv4-only).
       - name: status
         description: Check outcome domain (PASS / WARN / FAIL).
         tests:
@@ -50,9 +56,21 @@ models:
           - accepted_values:
               arguments:
                 values: ['PASS', 'WARN', 'FAIL']
+      - name: collected_at
+        description: Producer collection time (ISO-8601); cast to timestamptz in staging. Not load time.
+      - name: from_port
+        description: Rule start port as VARCHAR (may be All); JSON-string pin in fixtures.
+      - name: to_port
+        description: Rule end port as VARCHAR (may be All); JSON-string pin in fixtures.
+      - name: cidr_ip
+        description: IPv4 CIDR on the rule (producer is IPv4-only).
+      - name: sg_name
+        description: Human-readable security group name.
       - name: run_id
         description: Provenance stamp from the loader for this single-run snapshot.
         tests: [not_null]
+      - name: loaded_at
+        description: Loader stamp — when this row landed in raw; distinct from collected_at.
 
   - name: stg_cloudtrail_audit
     description: >
@@ -61,6 +79,8 @@ models:
       No uniqueness test — the producer emits no eventID; see contracts/_core.md
       Finding identity and contracts/cloudtrail_audit.md.
     columns:
+      - name: source
+        description: Producer id — always cloudtrail_audit for this model; stored in each row (self-describing).
       - name: check_id
         description: Kebab-case check catalog id; dim_controls join key with source.
         tests: [not_null]
@@ -74,11 +94,33 @@ models:
           - accepted_values:
               arguments:
                 values: ['PASS', 'WARN', 'FAIL']
+      - name: collected_at
+        description: Producer collection time (ISO-8601); cast to timestamptz in staging. Not load time.
+      - name: event_time
+        description: CloudTrail EventTime (timestamptz). Kept separate from collected_at.
+      - name: event_name
+        description: API / event name (e.g. ConsoleLogin). Populated on all four checks.
+      - name: event_source
+        description: >
+          Service source when the producer stores it; null on failed-api-call and
+          console-login (those dicts omit it).
+      - name: principal
+        description: >
+          CloudTrail Username; staging nullif('N/A') → NULL. Null when the check
+          omits the field (e.g. root-account-usage).
+      - name: error_code
+        description: Error code on failed API calls; null on other checks.
+      - name: source_ip
+        description: >
+          Origin IP on console-login findings; staging nullif('N/A') → NULL.
+          Null on other checks.
       - name: native_severity
         description: Raw CRITICAL/WARN/INFO preserved before lossy status map.
       - name: run_id
         description: Provenance stamp from the loader for this single-run snapshot.
         tests: [not_null]
+      - name: loaded_at
+        description: Loader stamp — when this row landed in raw; distinct from collected_at.
 
   - name: stg_evidence_logger
     description: >
@@ -88,6 +130,8 @@ models:
       (check_id, resource_id, policy_file, violated_attribute).
       resource_id has no not_null here — D4 / #11 Sid-less case.
     columns:
+      - name: source
+        description: Producer id — always evidence_logger for this model; stored in each row (self-describing).
       - name: check_id
         description: Kebab-case check catalog id; dim_controls join key with source.
         tests: [not_null]
@@ -95,10 +139,6 @@ models:
         description: >
           Policy statement Sid when present; NULL after nullif when the producer
           rendered optional Sid as the string 'None'. Nullable by design (D4).
-      - name: policy_file
-        description: Audited policy artifact path/name.
-      - name: violated_attribute
-        description: Action or Resource — which attribute failed the check.
       - name: status
         description: Check outcome domain (PASS / WARN / FAIL).
         tests:
@@ -106,6 +146,16 @@ models:
           - accepted_values:
               arguments:
                 values: ['PASS', 'WARN', 'FAIL']
+      - name: collected_at
+        description: Producer collection time (ISO-8601); cast to timestamptz in staging. Not load time.
+      - name: policy_file
+        description: Audited policy artifact path/name.
+      - name: violated_attribute
+        description: Action or Resource — which attribute failed the check.
+      - name: raw_message
+        description: Human-readable finding line; prefer producer-verbatim when available.
       - name: run_id
         description: Provenance stamp from the loader for this single-run snapshot.
         tests: [not_null]
+      - name: loaded_at
+        description: Loader stamp — when this row landed in raw; distinct from collected_at.

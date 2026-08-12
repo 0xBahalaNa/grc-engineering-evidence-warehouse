@@ -1,5 +1,5 @@
 with padded as (
-    select * from raw.s3_audit
+    select * from {{ source('raw', 's3_audit') }}
     union all by name
     select
         null::varchar as enc_type

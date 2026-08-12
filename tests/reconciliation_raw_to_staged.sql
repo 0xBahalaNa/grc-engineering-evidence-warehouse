@@ -27,7 +27,7 @@ SELECT
     manifest.run_id,
     manifest.row_count AS landed_count,
     coalesce(staged.staged_count, 0) AS staged_count
-FROM raw.load_manifest AS manifest
+FROM {{ source('raw', 'load_manifest') }} AS manifest
 LEFT JOIN staged
     ON manifest.source = staged.source
     AND manifest.run_id = staged.run_id

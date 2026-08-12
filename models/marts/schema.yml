@@ -40,20 +40,27 @@ models:
         -- (the provenance stamp for the load that built the mart).
     columns:
       - name: source
+        description: Producer id (s3_audit, sg_audit, cloudtrail_audit, evidence_logger).
         tests: [not_null]
       - name: check_id
+        description: Kebab-case check catalog id; dim_controls join key with source.
         tests: [not_null]
       - name: resource_id
-        # Nullable: evidence_logger Sid-less statements normalize 'None' → NULL
-        # in staging (D4 / #11). A missing Sid is absence of a subject id, not a
-        # value — asserting not_null forced the data to state something false.
+        description: >
+          Finding primary subject identifier. Nullable: evidence_logger Sid-less
+          statements normalize 'None' → NULL in staging (D4 / #11). A missing Sid
+          is absence of a subject id, not a value — asserting not_null forced the
+          data to state something false.
       - name: status
+        description: Normalized check outcome (PASS / WARN / FAIL).
         tests:
           - not_null
           - accepted_values:
               arguments:
                 values: ['PASS', 'WARN', 'FAIL']
       - name: collected_at
+        description: Producer collection time (timestamptz). Not loader loaded_at.
         tests: [not_null]
       - name: run_id
+        description: Provenance stamp for the current single-run snapshot (D12).
         tests: [not_null]
