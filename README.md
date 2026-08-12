@@ -12,7 +12,7 @@ The missing layer *after* the audit scripts run. Three AWS-API collectors ([`s3-
 
 The claim this repo exists to back up: **collecting evidence is not enough — you have to be able to prove the evidence set is complete, and show the lineage.**
 
-> **Status:** v1.0 in development (August 2026). Contract-first build — the warehouse publishes a findings schema per source and builds against checked-in JSON fixtures; live producer wiring (`--json` output PRs) follows.
+> **Status:** v1.0 shipped (August 2026). Contract-first build — the warehouse publishes a findings schema per source and builds against checked-in JSON fixtures; live producer wiring (`--json` output PRs) is the v1.1 track.
 
 ## Why This Exists
 
@@ -78,20 +78,31 @@ This slots into the broader evidence loop as the transform-retain-review layers:
 
 ## Sample Evidence Output
 
-A `fct_findings` excerpt (v1.0 target shape, built from checked-in fixtures):
+A `fct_findings` excerpt from a real `dbt build` over the checked-in fixtures. `control_ids` is not a mart column: `fct_findings` stays at finding grain, and the control mapping is produced at query time by joining `dim_controls` (one row per check-to-control pair). The query that produced this excerpt:
+
+```sql
+select f.source, f.check_id, f.resource_id, f.status,
+       string_agg(distinct c.control_id, ', ' order by c.control_id) as control_ids,
+       f.run_id, f.collected_at
+from fct_findings f
+left join dim_controls c
+  on f.source = c.source and f.check_id = c.check_id
+ and c.framework = 'NIST 800-53 Rev 5'
+group by all
+```
 
 | source | check_id | resource_id | status | control_ids | run_id | collected_at |
 |---|---|---|---|---|---|---|
-| s3_audit | s3-bucket-encryption-enabled | backups-unencrypted | FAIL | SC-28 | 20260715T130000Z | 2026-07-15T12:00:00Z |
-| sg_audit | open-to-internet-risky-port | sg-0abc123def456789a | FAIL | SC-7 | 20260715T130000Z | 2026-07-15T12:00:00Z |
-| cloudtrail_audit | root-account-usage | ACCOUNT | FAIL | AU-2, AC-6(9) | 20260715T130000Z | 2026-07-14T21:00:00Z |
-| evidence_logger | wildcard-action | DangerousAdmin | FAIL | AC-6 | 20260715T130000Z | 2026-07-14T21:00:00Z |
+| s3_audit | s3-bucket-encryption-enabled | backups-unencrypted | FAIL | SC-28, SC-28(1) | 20260812T151839Z | 2026-07-15T12:00:00Z |
+| sg_audit | open-to-internet-risky-port | sg-0abc123def456789a | FAIL | AC-3, AC-4, CM-7, SC-7, SC-7(3) | 20260812T151839Z | 2026-07-15T12:00:00Z |
+| cloudtrail_audit | root-account-usage | ACCOUNT | FAIL | AC-6(9), AU-2, AU-6, IA-2, SI-4 | 20260812T151839Z | 2026-07-14T21:00:00Z |
+| evidence_logger | wildcard-action | DangerousAdmin | FAIL | AC-6 | 20260812T151839Z | 2026-07-14T21:00:00Z |
 
 `status` above is the **normalized** mart value (`CRITICAL`→`FAIL` for root usage).
-`control_ids` is the `dim_controls` join output — not carried in raw fixtures — and the
-join is **one-to-many**: a single check can evidence several controls (root usage above).
-`collected_at` is the producer's collection time (per the checked-in fixtures); `run_id`
-stamps the load, so it always postdates the evidence it carries.
+The `dim_controls` join is **one-to-many**: a single check can evidence several controls,
+which is why the query aggregates with `string_agg`. `collected_at` is the producer's
+collection time (per the checked-in fixtures); `run_id` stamps the load, so it always
+postdates the evidence it carries.
 
 If `sg_audit` is absent from the landing directory on a load, completeness fails rather than letting the population go quietly short. Reproduce from repo root:
 
