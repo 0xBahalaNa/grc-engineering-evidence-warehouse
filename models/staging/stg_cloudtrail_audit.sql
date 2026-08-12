@@ -1,5 +1,5 @@
 with padded as (
-    select * from raw.cloudtrail_audit
+    select * from {{ source('raw', 'cloudtrail_audit') }}
     union all by name
     select
         null::varchar as event_source,

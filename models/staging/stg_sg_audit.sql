@@ -1,5 +1,5 @@
 with padded as (
-    select * from raw.sg_audit
+    select * from {{ source('raw', 'sg_audit') }}
     union all by name
     select
         null::varchar as from_port,

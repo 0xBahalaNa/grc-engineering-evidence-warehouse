@@ -1,5 +1,5 @@
 with padded as (
-    select * from raw.evidence_logger
+    select * from {{ source('raw', 'evidence_logger') }}
     union all by name
     select
         null::varchar as raw_message

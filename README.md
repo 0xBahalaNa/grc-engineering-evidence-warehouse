@@ -8,7 +8,7 @@
 
 # Evidence Warehouse
 
-The missing layer *after* the audit scripts run. Three AWS-API collectors ([`s3-audit`](https://github.com/0xBahalaNa/s3-audit), [`sg-audit`](https://github.com/0xBahalaNa/sg-audit), [`cloudtrail-audit`](https://github.com/0xBahalaNa/cloudtrail-audit)) plus one local policy-file checker ([`evidence-logger`](https://github.com/0xBahalaNa/evidence-logger)) each emit findings — and those findings evaporate at the terminal. This warehouse treats audit evidence as a data product: producer outputs land as raw records in DuckDB, dbt stages and unifies them into a queryable findings model, schema tests pin the contract at the data layer, completeness and reconciliation tests prove every expected collector reported and that landing was lossless (keyed on `raw.load_manifest`), and dbt docs publish the lineage from staging to mart (dbt `source()` nodes / source→mart lineage are planned — #7).
+The missing layer *after* the audit scripts run. Three AWS-API collectors ([`s3-audit`](https://github.com/0xBahalaNa/s3-audit), [`sg-audit`](https://github.com/0xBahalaNa/sg-audit), [`cloudtrail-audit`](https://github.com/0xBahalaNa/cloudtrail-audit)) plus one local policy-file checker ([`evidence-logger`](https://github.com/0xBahalaNa/evidence-logger)) each emit findings — and those findings evaporate at the terminal. This warehouse treats audit evidence as a data product: producer outputs land as raw records in DuckDB, dbt stages and unifies them into a queryable findings model, schema tests pin the contract at the data layer, completeness and reconciliation tests prove every expected collector reported and that landing was lossless (keyed on `raw.load_manifest`), and dbt docs publish source → staging → mart lineage.
 
 The claim this repo exists to back up: **collecting evidence is not enough — you have to be able to prove the evidence set is complete, and show the lineage.**
 
@@ -34,7 +34,7 @@ graph LR
     B --> C[("DuckDB<br/>raw schema")]
     C --> D["dbt staging<br/>stg_* — one model per source"]
     D --> E["marts<br/>fct_findings + dim_controls"]
-    E --> F["dbt docs<br/>staging → mart lineage<br/>(source nodes: #7)"]
+    E --> F["dbt docs<br/>source → staging → mart lineage"]
     E --> G["Evidence.dev report<br/>(stretch)"]
     D -.->|"dbt tests: schema · completeness · reconciliation"| E
 ```
@@ -65,7 +65,7 @@ The dbt tests aren't code hygiene — they are the control implementation:
 
 ## How an Auditor Uses This Output
 
-When an assessor asks for the population of security checks in the current load, `fct_findings` answers it directly: filter by the run's `run_id`, group by control family or status. A green build proves every expected collector reported in that run and that landed counts match staged counts — the questions auditors otherwise resolve through sampling and re-performance. That proof is scoped honestly: it does not cover what each collector can see (known producer blind spots are documented per source in `contracts/`), and it is per-run only (one snapshot retained). Zero-finding sources are represented in `raw.load_manifest` with `row_count = 0` so "ran and found nothing" is distinguishable from "never ran"; completeness passes on that signal, but full `dbt build` still errors until staging tolerates a missing `raw.<source>` table. `dbt docs` renders lineage from staging to mart so the path from landed record to finding is inspectable rather than asserted.
+When an assessor asks for the population of security checks in the current load, `fct_findings` answers it directly: filter by the run's `run_id`, group by control family or status. A green build proves every expected collector reported in that run and that landed counts match staged counts — the questions auditors otherwise resolve through sampling and re-performance. That proof is scoped honestly: it does not cover what each collector can see (known producer blind spots are documented per source in `contracts/`), and it is per-run only (one snapshot retained). Zero-finding sources are represented in `raw.load_manifest` with `row_count = 0` so "ran and found nothing" is distinguishable from "never ran"; completeness passes on that signal, but full `dbt build` still errors until staging tolerates a missing `raw.<source>` table. `dbt docs` renders source → staging → mart lineage so the path from landed record to finding is inspectable rather than asserted.
 
 This slots into the broader evidence loop as the transform-retain-review layers: producers detect, the warehouse lands raw records stamped with `run_id` and `loaded_at`, transforms them under test, and serves the review surface (AU-6) that turns collector output into audit-record analysis.
 
@@ -126,7 +126,7 @@ To falsify reconciliation: after a green load, `delete` one row from `raw.s3_aud
 mkdir -p raw && cp fixtures/*.json raw/    # landing dir (fixtures stay immutable)
 python ingest/load_raw.py --raw-dir raw/   # EL: land JSON into DuckDB raw schema (run_id + loaded_at + load_manifest)
 dbt build                                  # models + tests — the control layer gates here
-dbt docs generate && dbt docs serve        # browse staging → mart lineage (source nodes: #7)
+dbt docs generate && dbt docs serve        # browse source → staging → mart lineage
 ```
 
 ## Repository Structure
