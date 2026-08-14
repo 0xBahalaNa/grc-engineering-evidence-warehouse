@@ -1,7 +1,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat)
 ![NIST 800-53](https://img.shields.io/badge/NIST-800--53%20Rev%205-004990?style=flat)
 ![FedRAMP](https://img.shields.io/badge/FedRAMP-High%20Baseline-0071bc?style=flat)
-![CJIS](https://img.shields.io/badge/CJIS-Security%20Policy%20v6.0-cc0000?style=flat)
+![CJIS](https://img.shields.io/badge/CJIS-Security%20Policy%20v6.1-cc0000?style=flat)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)
 ![dbt](https://img.shields.io/badge/dbt-duckdb-FF694B?style=flat)
 ![DuckDB](https://img.shields.io/badge/DuckDB-warehouse-fff100?style=flat)
@@ -39,7 +39,7 @@ graph LR
     D -.->|"dbt tests: schema · completeness · reconciliation"| E
 ```
 
-The split is deliberately ELT: the Python loader does extract-and-load only — raw JSON files land in DuckDB `raw.*` tables with every row stamped with `run_id` and `loaded_at`, plus a `raw.load_manifest` row per landing file (including empty arrays at `row_count = 0`), and nothing else. All transformation lives in dbt, where it is versioned, tested, and documented. Staging models normalize each source to one row per finding with consistent types and status values; the `fct_findings` mart unifies all sources into a single queryable evidence table, joined to `dim_controls` — a seed mapping every check to its NIST 800-53 / FedRAMP High / CJIS v6.0 controls.
+The split is deliberately ELT: the Python loader does extract-and-load only — raw JSON files land in DuckDB `raw.*` tables with every row stamped with `run_id` and `loaded_at`, plus a `raw.load_manifest` row per landing file (including empty arrays at `row_count = 0`), and nothing else. All transformation lives in dbt, where it is versioned, tested, and documented. Staging models normalize each source to one row per finding with consistent types and status values; the `fct_findings` mart unifies all sources into a single queryable evidence table, joined to `dim_controls` — a seed mapping every check to its NIST 800-53 / FedRAMP High / CJIS v6.1 controls.
 
 **Single-run snapshot:** each load rebuilds `raw.*`. `run_id` is a provenance stamp for the current collection, not retained history across loads. Multi-run retention is a deferred design change.
 
@@ -47,7 +47,7 @@ The split is deliberately ELT: the Python loader does extract-and-load only — 
 
 These are the warehouse's own controls. The producers' controls (SC-28, SC-7, AU-2/AC-6(9), AC-3/AC-6) travel with their findings through the `dim_controls` mapping.
 
-| NIST 800-53 Rev 5 | FedRAMP High | CJIS v6.0 | How This Repo Validates |
+| NIST 800-53 Rev 5 | FedRAMP High | CJIS v6.1 | How This Repo Validates |
 |---|:---:|:---:|---|
 | AU-6 | Yes | Weekly-review + 1-year-retention delta | The analysis layer over collector output — findings queryable by control family, status, and the current run's provenance stamp |
 | CA-7 | Yes | — | Per-run completeness enforcement: every expected collector must report in the load — not continuous monitoring or trending over time (the warehouse retains one run) |
