@@ -11,7 +11,7 @@ seeds:
       contracts/cloudtrail_audit.md). No mapping is sourced from a control
       catalog alone — an unsourced mapping is a fabricated control claim.
 
-      CJIS v6.0 coverage is partial by design, mapped only where a producer
+      CJIS v6.1 coverage is partial by design, mapped only where a producer
       README states a CJIS obligation: sg_audit SC-7, s3_audit SC-28 (encryption
       check only), cloudtrail_audit AU-6 (all four checks). Seven of the ten
       checks carry CJIS; the three that do not are s3-bucket-public-access-block-
@@ -21,7 +21,7 @@ seeds:
       (AC-6 / AC-3). Absence of a CJIS row means "not mapped from a stated
       source," never "no CJIS obligation exists."
 
-      CJIS v6.0 is cited by NIST 800-53 Rev 5 control ID, not by the v5.9 policy-
+      CJIS v6.1 is cited by NIST 800-53 Rev 5 control ID, not by the v5.9 policy-
       area numbering it replaced — a control_id here must resolve in the cjis-v6
       baseline.
     config:
@@ -40,7 +40,7 @@ seeds:
           - not_null
           - accepted_values:
               arguments:
-                values: ['NIST 800-53 Rev 5', 'FedRAMP High', 'CJIS v6.0']
+                values: ['NIST 800-53 Rev 5', 'FedRAMP High', 'CJIS v6.1']
       - name: control_id
         tests: [not_null]
 
