@@ -100,7 +100,12 @@ group by all
 
 `status` above is the **normalized** mart value (`CRITICAL`→`FAIL` for root usage).
 The `dim_controls` join is **one-to-many**: a single check can evidence several controls,
-which is why the query aggregates with `string_agg`. `collected_at` is the producer's
+which is why the query aggregates with `string_agg`. The `control_ids` in these rows come
+from the `dim_controls` seed, not from warehouse logic: each seed row traces to a producer
+repo's control table or to this repo's `contracts/` (the cloudtrail AU-2 and AC-6(9)
+mappings are contract-authored). The warehouse stores and joins the mappings rather than
+claiming them as its own coverage; the warehouse's own controls are the table under
+"Compliance Controls Addressed" above. `collected_at` is the producer's
 collection time (per the checked-in fixtures); `run_id` stamps the load, so it always
 postdates the evidence it carries.
 
