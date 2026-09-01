@@ -20,6 +20,14 @@ An evidence population with a silently missing source is the classic audit failu
 
 The design is contract-first: none of the producers emits structured output today, so the warehouse owns the contract. Each source gets a documented findings schema, checked-in fixtures conform to it, and the entire dbt project builds and tests against those fixtures. That's the pattern warehouse teams use to develop against sources they don't control. Producers are then retrofitted to emit conforming JSON, one small PR each.
 
+## Impact
+
+The manual alternative is how evidence populations are actually verified today: an auditor samples the tool output, re-performs a handful of checks, and asserts completeness because nothing looked missing. A collector that silently failed is invisible in that process, and absence of findings reads as absence of problems.
+
+With this warehouse, completeness is a test, not an assertion. One `dbt build` proves every expected collector reported in the load and that landed row counts match staged counts, and it fails naming the missing source when they don't. The question an assessor resolves through sampling and re-performance becomes a green build they can falsify themselves in three commands (see [Sample Evidence Output](#sample-evidence-output)).
+
+I have not priced this in hours because these four producers never ran inside a manual audit shop. The honest claim is categorical: population completeness moves from asserted to proven, per run, at the data layer.
+
 ## Architecture Overview
 
 ```mermaid
