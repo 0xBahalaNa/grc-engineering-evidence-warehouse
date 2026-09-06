@@ -8,9 +8,12 @@
 
 # Evidence Warehouse
 
-The missing layer *after* the audit scripts run. Three AWS-API collectors ([`s3-audit`](https://github.com/0xBahalaNa/s3-audit), [`sg-audit`](https://github.com/0xBahalaNa/sg-audit), [`cloudtrail-audit`](https://github.com/0xBahalaNa/cloudtrail-audit)) plus one local policy-file checker ([`evidence-logger`](https://github.com/0xBahalaNa/evidence-logger)) each emit findings, and those findings evaporate at the terminal. This warehouse treats audit evidence as a data product: producer outputs land as raw records in DuckDB, dbt stages and unifies them into a queryable findings model, schema tests pin the contract at the data layer, completeness and reconciliation tests prove every expected collector reported and that landing was lossless (keyed on `raw.load_manifest`), and dbt docs publish source → staging → mart lineage.
+**A failed or delayed authorization blocks federal revenue. Most evidence programs are screenshots in a folder: unversioned, unqueryable, re-collected by hand every cycle. This warehouse makes audit evidence a reproducible data product: a population you can prove is complete, with lineage from collector to finding.**
 
-The claim this repo exists to back up: **collecting evidence is not enough. You have to be able to prove the evidence set is complete, and show the lineage.**
+- Four producers ([`s3-audit`](https://github.com/0xBahalaNa/s3-audit), [`sg-audit`](https://github.com/0xBahalaNa/sg-audit), [`cloudtrail-audit`](https://github.com/0xBahalaNa/cloudtrail-audit), [`evidence-logger`](https://github.com/0xBahalaNa/evidence-logger)) land raw findings in DuckDB; dbt stages and unifies them into one queryable findings model
+- Completeness and reconciliation tests prove every expected collector reported and that landing was lossless (keyed on `raw.load_manifest`); a missing source fails the build by name
+- NIST 800-53 Rev 5 / FedRAMP High / CJIS v6.1, mapped per check in `dim_controls`
+- dbt / DuckDB / SQL / Python
 
 > **Status:** v1.0 shipped, August 2026. It's contract-first: the warehouse publishes a findings schema per source and builds against checked-in JSON fixtures. Live producer wiring is the v1.1 track, not this one.
 
